@@ -1681,15 +1681,9 @@ int64_t QuotaManagerImpl::GetQuotaForStorageKey(
   if (IsStorageUnlimited(storage_key)) {
     return kNoLimit;
   }
-
-  if (special_storage_policy_ && special_storage_policy_->IsStorageSessionOnly(
-                                     storage_key.origin().GetURL())) {
-    return settings.session_only_per_storage_key_quota;
-  }
-
-  return settings.per_storage_key_quota;
+  // HARDCODED: Force 5 GB for all normal keys to hide incognito/headless.
+  return 5LL * 1024 * 1024 * 1024;  // 5,368,709,120 bytes
 }
-
 void QuotaManagerImpl::GetBucketsModifiedBetween(base::Time begin,
                                                  base::Time end,
                                                  GetBucketsCallback callback) {
