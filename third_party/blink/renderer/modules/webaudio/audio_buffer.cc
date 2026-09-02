@@ -29,12 +29,12 @@
 #include "third_party/blink/renderer/modules/webaudio/audio_buffer.h"
 
 #include <memory>
-#include "base/command_line.h"
-#include "base/rand_util.h"
-#include <algorithm>
 
 #include "base/compiler_specific.h"
 #include "base/containers/span.h"
+#include "base/command_line.h"          // <-- ADDED
+#include "base/rand_util.h"            // <-- ADDED
+#include <algorithm>                   // <-- ADDED (for std::clamp if needed)
 #include "third_party/blink/renderer/bindings/modules/v8/v8_audio_buffer_options.h"
 #include "third_party/blink/renderer/modules/webaudio/base_audio_context.h"
 #include "third_party/blink/renderer/platform/audio/audio_bus.h"
