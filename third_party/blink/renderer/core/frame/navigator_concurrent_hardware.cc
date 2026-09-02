@@ -9,7 +9,8 @@
 namespace blink {
 
 unsigned NavigatorConcurrentHardware::hardwareConcurrency() const {
-  return static_cast<unsigned>(base::SysInfo::NumberOfProcessors());
+  // PATCH: Force 8 cores to hide headless/VM environment
+  return 8;
 }
 
 }  // namespace blink
