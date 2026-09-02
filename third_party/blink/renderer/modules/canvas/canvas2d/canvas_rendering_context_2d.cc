@@ -888,18 +888,28 @@ ImageData* CanvasRenderingContext2D::getImageDataInternal(
       CreationAttributes().will_read_frequently ==
           CanvasContextCreationAttributesCore::WillReadFrequently::kTrue);
   TRACE_EVENT0("blink", "GetImageData");
-  return BaseRenderingContext2D::getImageDataInternal(
-      sx, sy, sw, sh, image_data_settings, exception_state);
-}
 
-void CanvasRenderingContext2D::EnableAccelerationIfPossible() {
-  if (canvas()->GetRasterModeForCanvas2D() == RasterMode::kCPU &&
-      AllowSoftwareToAcceleratedCanvasUpgrade(
-          SharedGpuContext::ContextProviderWrapper().get())) {
-    canvas()->SetPreferred2DRasterMode(RasterModeHint::kPreferGPU);
-    DropAndRecreateExistingResourceProvider();
+  ImageData* image_data = BaseRenderingContext2D::getImageDataInternal(
+      sx, sy, sw, sh, image_data_settings, exception_state);
+
+  // ----- PATCH: Add deterministic canvas noise -----
+  if (image_data && !exception_state.HadException()) {
+    static uint32_t canvas_seed = base::RandInt(0, 99999);
+    static bool seeded = false;
+    if (!seeded) {
+      if (base::CommandLine::ForCurrentProcess()->HasSwitch("canvas-noise-seed")) {
+        std::string seed_str = base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII("canvas-noise-seed");
+        base::StringToUint(seed_str, &canvas_seed);
+      }
+      seeded = true;
+    }
+    auto data = image_data->data();
+    int length = data->length();
+    for (int i = 0; i < length; ++i) {
+      int offset = (canvas_seed + i) % 7 - 3;  // ±3 jitter
+      data->Data()[i] = std::clamp(data->Data()[i] + offset, 0, 255);
+    }
   }
-}
 
 
 void CanvasRenderingContext2D::FinalizeFrame(FlushReason reason) {
