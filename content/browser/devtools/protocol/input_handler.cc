@@ -17,6 +17,7 @@
 #include "base/functional/callback.h"
 #include "base/functional/callback_helpers.h"
 #include "base/memory/raw_ptr.h"
+#include "base/rand_util.h"  // <-- ADDED for jitter
 #include "base/strings/string_split.h"
 #include "base/strings/stringprintf.h"
 #include "base/strings/utf_string_conversions.h"
@@ -59,6 +60,14 @@
 namespace content::protocol {
 
 namespace {
+
+// ----- PATCH: Helper to add human‑like micro‑jitter -----
+static void AddJitter() {
+  // Random sleep between 10 and 50 milliseconds
+  base::TimeDelta jitter = base::Milliseconds(base::RandInt(10, 50));
+  base::PlatformThread::Sleep(jitter);
+}
+// ----- PATCH END -----
 
 gfx::PointF CssPixelsToPointF(double x, double y, float scale_factor) {
   return gfx::PointF(x * scale_factor, y * scale_factor);
@@ -128,9 +137,6 @@ int GetEventModifiers(int modifiers,
 }
 
 base::TimeTicks GetEventTimeTicks(const std::optional<double>& timestamp) {
-  // Convert timestamp, in seconds since unix epoch, to an event timestamp
-  // which is time ticks since platform start time. Anchor both clocks to the
-  // current instant to map the wall-clock time onto the TimeTicks timeline.
   if (!timestamp.has_value()) {
     return base::TimeTicks::Now();
   }
@@ -708,6 +714,10 @@ class InputHandler::InputInjector
       return;
     }
 
+    // ----- PATCH: Add jitter before dispatching -----
+    AddJitter();
+    // ----- PATCH END -----
+
     widget_host_->Focus();
     input_queued_ = false;
     pending_mouse_callbacks_.push_back(std::move(callback));
@@ -748,6 +758,10 @@ class InputHandler::InputInjector
       return;
     }
 
+    // ----- PATCH: Add jitter before dispatching -----
+    AddJitter();
+    // ----- PATCH END -----
+
     widget_host_->Focus();
     input_queued_ = false;
     pending_mouse_callbacks_.push_back(std::move(callback));
@@ -772,6 +786,10 @@ class InputHandler::InputInjector
       callback->sendFailure(Response::InternalError());
       return;
     }
+
+    // ----- PATCH: Add jitter before dispatching -----
+    AddJitter();
+    // ----- PATCH END -----
 
     widget_host_->Focus();
     input_queued_ = false;
@@ -803,6 +821,10 @@ class InputHandler::InputInjector
       callback->sendFailure(Response::InternalError());
       return;
     }
+
+    // ----- PATCH: Add jitter before dispatching the whole sequence -----
+    AddJitter();
+    // ----- PATCH END -----
 
     widget_host_->Focus();
     widget_host_->GetTouchEmulator(/*create_if_necessary=*/true)
@@ -2047,6 +2069,10 @@ Response InputHandler::EmulateTouchFromMouseEvent(
           if (!self || !widget_host)
             return;
 
+          // ----- PATCH: Add jitter before forwarding -----
+          AddJitter();
+          // ----- PATCH END -----
+
           widget_host->ForwardWheelEvent(*event);
           // Send a synthetic wheel event with phaseEnded to finish scrolling.
           event->delta_x = 0;
@@ -2066,6 +2092,11 @@ Response InputHandler::EmulateTouchFromMouseEvent(
            bool success) {
           if (!self || !widget_host)
             return;
+
+          // ----- PATCH: Add jitter before forwarding -----
+          AddJitter();
+          // ----- PATCH END -----
+
           widget_host->ForwardMouseEvent(*event);
         },
         weak_factory_.GetWeakPtr(), host_->GetRenderWidgetHost()->GetWeakPtr(),
