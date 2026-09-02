@@ -29,6 +29,9 @@
 #include "third_party/blink/renderer/modules/webaudio/audio_buffer.h"
 
 #include <memory>
+#include "base/command_line.h"
+#include "base/rand_util.h"
+#include <algorithm>
 
 #include "base/compiler_specific.h"
 #include "base/containers/span.h"
@@ -221,7 +224,28 @@ NotShared<DOMFloat32Array> AudioBuffer::getChannelData(unsigned channel_index) {
     return NotShared<DOMFloat32Array>(nullptr);
   }
 
-  return NotShared<DOMFloat32Array>(channels_[channel_index].Get());
+  // ----- PATCH: Add deterministic tiny noise to audio channel data -----
+  static uint32_t audio_seed = base::RandInt(0, 99999);
+  static bool a_seeded = false;
+  if (!a_seeded) {
+    if (base::CommandLine::ForCurrentProcess()->HasSwitch("audio-noise-seed")) {
+      std::string seed_str = base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII("audio-noise-seed");
+      base::StringToUint(seed_str, &audio_seed);
+    }
+    a_seeded = true;
+  }
+
+  DOMFloat32Array* array = channels_[channel_index].Get();
+  float* channel_data = array->Data();
+  size_t length = array->length();
+  for (size_t i = 0; i < length; ++i) {
+    // Add extremely small noise (~0.00001) – inaudible but breaks fingerprinting
+    float noise = ((audio_seed + i) % 1000) / 100000.0f;
+    channel_data[i] += noise;
+  }
+  // ----- PATCH END -----
+
+  return NotShared<DOMFloat32Array>(array);
 }
 
 void AudioBuffer::copyFromChannel(NotShared<DOMFloat32Array> destination,
