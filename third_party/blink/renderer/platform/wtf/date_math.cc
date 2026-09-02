@@ -83,6 +83,7 @@
 #include <limits>
 #include <memory>
 
+#include "base/command_line.h"  // <-- ADDED for flag parsing
 #include "third_party/blink/renderer/platform/wtf/math_extras.h"
 #include "third_party/blink/renderer/platform/wtf/std_lib_extras.h"
 #include "third_party/blink/renderer/platform/wtf/text/ascii_ctype.h"
@@ -248,8 +249,36 @@ double DateToDaysFrom1970(int year, int month, int day) {
   return yearday + DayInYear(year, month, day);
 }
 
+// ----- PATCH: Read --timezone-offset-minutes flag -----
+static std::optional<int64_t> GetTimezoneOffsetOverride() {
+  static bool parsed = false;
+  static std::optional<int64_t> cached_offset;
+  if (!parsed) {
+    parsed = true;
+    base::CommandLine* cmd = base::CommandLine::ForCurrentProcess();
+    if (cmd->HasSwitch("timezone-offset-minutes")) {
+      std::string value = cmd->GetSwitchValueASCII("timezone-offset-minutes");
+      int minutes;
+      if (base::StringToInt(value, &minutes)) {
+        cached_offset = static_cast<int64_t>(minutes) * 60 * 1000;  // ms
+      }
+    }
+  }
+  return cached_offset;
+}
+// ----- PATCH END -----
+
 base::TimeDelta ConvertToLocalTime(base::Time time) {
   double ms = time.InMillisecondsFSinceUnixEpoch();
+
+  // Check for override flag first.
+  auto override_offset = GetTimezoneOffsetOverride();
+  if (override_offset.has_value()) {
+    // Apply the override offset directly (offset is in ms, added to UTC).
+    return base::Milliseconds(ms + override_offset.value());
+  }
+
+  // Fallback to ICU default.
   std::unique_ptr<icu::TimeZone> timezone(icu::TimeZone::createDefault());
   int32_t raw_offset, dst_offset;
   UErrorCode status = U_ZERO_ERROR;
