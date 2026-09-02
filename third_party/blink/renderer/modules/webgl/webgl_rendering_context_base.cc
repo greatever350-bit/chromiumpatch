@@ -29,7 +29,9 @@
 
 #include <memory>
 #include <utility>
-
+#include "base/command_line.h"
+#include "base/rand_util.h"
+#include <algorithm>
 #include "base/bit_cast.h"
 #include "base/byte_size.h"
 #include "base/compiler_specific.h"
@@ -5355,6 +5357,29 @@ void WebGLRenderingContextBase::ReadPixelsHelper(GLint x,
       return;
     }
     ContextGL()->ReadPixels(x, y, width, height, format, type, data);
+  // ----- PATCH: Add deterministic noise to WebGL readPixels -----
+static uint32_t webgl_seed = base::RandInt(0, 99999);
+static bool w_seeded = false;
+if (!w_seeded) {
+  if (base::CommandLine::ForCurrentProcess()->HasSwitch("webgl-noise-seed")) {
+    std::string seed_str = base::CommandLine::ForCurrentProcess()->GetSwitchValueASCII("webgl-noise-seed");
+    base::StringToUint(seed_str, &webgl_seed);
+  }
+  w_seeded = true;
+}
+if (pixels && width > 0 && height > 0) {
+  size_t bytes_per_pixel = 4;  // Assumes RGBA; adjust if format differs
+  size_t total_bytes = width * height * bytes_per_pixel;
+  uint8_t* ptr = static_cast<uint8_t*>(pixels->BaseAddressMaybeShared()) + offset;
+  if (ptr) {
+    for (size_t i = 0; i < total_bytes; ++i) {
+      int offset_noise = (webgl_seed + i) % 5 - 2;  // ±2 jitter
+      ptr[i] = std::clamp(ptr[i] + offset_noise, 0, 255);
+    }
+  }
+}
+// ----- PATCH END ----- 
+   
   }
 }
 
