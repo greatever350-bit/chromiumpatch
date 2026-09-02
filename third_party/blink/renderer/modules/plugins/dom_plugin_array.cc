@@ -35,34 +35,69 @@
 namespace blink {
 
 namespace {
-DOMPlugin* MakeFakePlugin(String plugin_name, LocalDOMWindow* window) {
-  String description = "Portable Document Format";
-  String filename = "internal-pdf-viewer";
+DOMPlugin* MakeFakePlugin(const String& plugin_name, LocalDOMWindow* window) {
+  String description, filename;
+  // Map plugin names to realistic descriptions and filenames.
+  if (plugin_name == "Chrome PDF Plugin") {
+    description = "Portable Document Format";
+    filename = "internal-pdf-viewer";
+  } else if (plugin_name == "Chrome PDF Viewer") {
+    description = "PDF Viewer";
+    filename = "mhjfbmdgcfjbbpaeojofohoefgiehjai";
+  } else if (plugin_name == "Native Client") {
+    description = "Native Client Executable";
+    filename = "internal-nacl-plugin";
+  } else if (plugin_name == "Chrome Remote Desktop") {
+    description = "Remote Desktop";
+    filename = "internal-remoting-viewer";
+  } else if (plugin_name == "Widevine Content Decryption Module") {
+    description = "Widevine CDM";
+    filename = "internal-widevine-cdm";
+  } else {
+    description = "Plugin";
+    filename = "plugin";
+  }
+
   auto* plugin_info =
       MakeGarbageCollected<PluginInfo>(plugin_name, filename, description,
                                        /*background_color=*/Color::kTransparent,
                                        /*may_use_external_handler=*/false);
-  Vector<String> extensions{"pdf"};
-  for (const char* mime_type : {"application/pdf", "text/pdf"}) {
+  // Add typical MIME types for each plugin (optional, but improves realism).
+  Vector<String> extensions;
+  if (plugin_name == "Chrome PDF Plugin" || plugin_name == "Chrome PDF Viewer") {
+    extensions.push_back("pdf");
+    for (const char* mime : {"application/pdf", "text/pdf"}) {
+      auto* mime_info = MakeGarbageCollected<MimeClassInfo>(
+          mime, description, *plugin_info, extensions);
+      plugin_info->AddMimeType(mime_info);
+    }
+  } else if (plugin_name == "Native Client") {
+    // NaCl has its own MIME type.
     auto* mime_info = MakeGarbageCollected<MimeClassInfo>(
-        mime_type, description, *plugin_info, extensions);
+        "application/x-nacl", description, *plugin_info, extensions);
+    plugin_info->AddMimeType(mime_info);
+  } else if (plugin_name == "Widevine Content Decryption Module") {
+    auto* mime_info = MakeGarbageCollected<MimeClassInfo>(
+        "application/x-ppapi-widevine-cdm", description, *plugin_info, extensions);
     plugin_info->AddMimeType(mime_info);
   }
+  // Add others as needed.
   return MakeGarbageCollected<DOMPlugin>(window, *plugin_info);
 }
 }  // namespace
 
 DOMPluginArray::DOMPluginArray(LocalDOMWindow* window) : window_(window) {
-  if (IsPdfViewerAvailable()) {
-    // See crbug.com/1164635 and https://github.com/whatwg/html/pull/6738.
-    // To reduce fingerprinting and make plugins/mimetypes more
-    // interoperable, this is the spec'd, hard-coded list of plugins:
-    Vector<String> plugins{"PDF Viewer", "Chrome PDF Viewer",
-                           "Chromium PDF Viewer", "Microsoft Edge PDF Viewer",
-                           "WebKit built-in PDF"};
-    for (auto name : plugins) {
-      dom_plugins_.push_back(MakeFakePlugin(name, window));
-    }
+  // Force the hardcoded list regardless of PDF viewer availability.
+  // Use the exact 5 plugins that a real Chrome installation reports.
+  Vector<String> plugins{
+      "Chrome PDF Plugin",
+      "Chrome PDF Viewer",
+      "Native Client",
+      "Chrome Remote Desktop",
+      "Widevine Content Decryption Module"
+  };
+  for (auto name : plugins) {
+    dom_plugins_.push_back(MakeFakePlugin(name, window));
   }
 }
 
