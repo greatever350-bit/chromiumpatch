@@ -17,9 +17,6 @@ namespace blink {
 Vector<String> ParseAndSanitize(const String& accept_languages) {
   Vector<String> languages = accept_languages.SplitSkippingEmpty(',');
 
-  // Sanitizing tokens. We could do that more extensively but we should assume
-  // that the accept languages are already sane and support BCP47. It is
-  // likely a waste of time to make sure the tokens matches that spec here.
   for (wtf_size_t i = 0; i < languages.size(); ++i) {
     String& token = languages[i];
     token = token.StripWhiteSpace();
@@ -46,16 +43,9 @@ const Vector<String>& NavigatorLanguage::languages() {
 }
 
 bool NavigatorLanguage::IsLanguagesDirty() const {
-  // Check if the language has override. If so, consider the language is dirty.
-  // This is required, as `IsLanguagesDirty` properly is used to cache
-  // v8 value of `languages` in `navigator_language.idl`, while the
-  // `languages_dirty_` represents the state of the `languages_`. If `languages`
-  // was accessed, the `languages_dirty_` is set to false, but the
-  // `navigator_language.idl` still holds the old cached value.
   String accept_languages_override;
   probe::ApplyAcceptLanguageOverride(execution_context_,
                                      &accept_languages_override);
-
   return languages_dirty_ || !accept_languages_override.IsNull();
 }
 
@@ -73,30 +63,14 @@ void NavigatorLanguage::EnsureUpdatedLanguage() {
   probe::ApplyAcceptLanguageOverride(execution_context_,
                                      &accept_languages_override);
   if (!accept_languages_override.IsNull()) {
-    // If the language has override, force use the override regardless of the
-    // `languages_dirty_` state. This is required to allow for workers to
-    // respect the override.
     languages_ = ParseAndSanitize(accept_languages_override);
-    // Mark the language as dirty, so that if the override is removed, the
-    // language will be updated.
     languages_dirty_ = true;
     return;
   }
 
   if (languages_dirty_) {
     languages_ = ParseAndSanitize(GetAcceptLanguages());
-    // Reduce the Accept-Language if the ReduceAcceptLanguage deprecation
-    // trial is not enabled and feature flag ReduceAcceptLanguage is enabled.
-    if (RuntimeEnabledFeatures::DisableReduceAcceptLanguageEnabled(
-            execution_context_)) {
-      UseCounter::Count(execution_context_,
-                        WebFeature::kDisableReduceAcceptLanguage);
-    } else if (base::FeatureList::IsEnabled(
-                   network::features::kReduceAcceptLanguage) &&
-               !base::CommandLine::ForCurrentProcess()->HasSwitch(
-                   blink::switches::kDisableReduceAcceptLanguage)) {
-      languages_ = Vector<String>({languages_.front()});
-    }
+    // PATCH: Reduction logic removed – full list is kept.
     languages_dirty_ = false;
   }
 }
