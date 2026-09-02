@@ -580,7 +580,21 @@ bool CollectBasicGraphicsInfo(const base::CommandLine* command_line,
     return true;
   }
 
-  return CollectBasicGraphicsInfo(gpu_info);
+  // ------ PATCH BEGINS ------
+  bool success = CollectBasicGraphicsInfo(gpu_info);
+  // Force Intel GPU fingerprint to hide VM/headless detection
+  gpu_info->gpu.vendor_string = "Intel Inc.";
+  gpu_info->gpu.device_string = "Intel Iris OpenGL Engine";
+  gpu_info->gpu.active_vendor_id = 0x8086;   // Intel PCI ID
+  gpu_info->gpu.active_device_id = 0x9bc4;   // Intel HD Graphics 620
+  for (auto& secondary : gpu_info->secondary_gpus) {
+    secondary.vendor_string = "Intel Inc.";
+    secondary.device_string = "Intel Iris OpenGL Engine";
+    secondary.active_vendor_id = 0x8086;
+    secondary.active_device_id = 0x9bc4;
+  }
+  // ------ PATCH ENDS ------
+  return success;
 }
 
 bool CollectGraphicsInfoGL(GPUInfo* gpu_info, gl::GLDisplay* display) {
