@@ -12,7 +12,8 @@
 namespace blink {
 
 float NavigatorDeviceMemory::deviceMemory() const {
-  return ApproximatedDeviceMemory::GetApproximatedDeviceMemory();
+  // PATCH: Force 8 GB RAM to hide headless/VM environment
+  return 8.0f;
 }
 
 }  // namespace blink
